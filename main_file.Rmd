@@ -1,0 +1,91 @@
+---
+title: "DataSience_FinalProject"
+author: "Jan Steinwender & Paul Pavlis"
+date: "2020-10-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Clean the environment variables (*Temporary*)
+*Remove this whole header before handing the project in. This is just so that working with the document is easier*
+```{r}
+rm(list = ls())
+```
+
+# Load needed libraries
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+# Data wrangling
+
+## Data import from csv file
+
+```{r}
+restaurant_data = read.csv(file = "restaurants_data.csv")
+restaurant_data = restaurant_data %>% na_if("") # Set empty data entries to NA
+```
+
+## Clean the data
+
+### Rename and remove columns
+
+```{r}
+restaurant_data = as_tibble(restaurant_data)
+
+restaurant_data = restaurant_data %>%
+  rename("Cuisine_Style" = Cuisine.Style) %>%
+  rename("Price_Range" = Price.Range) %>%
+  rename("Review_Number" = Number.of.Reviews)
+
+restaurant_data = restaurant_data %>%
+  mutate(X = NULL, URL_TA = NULL, ID_TA = NULL) # Remove useless lines
+```
+
+### Correct the column types
+
+```{r}
+restaurant_data = restaurant_data %>% mutate(City = as_factor(City)) # Change from character to factor
+
+restaurant_data = restaurant_data %>% mutate(Price_Range = as_factor(Price_Range)) # Change from character to factor
+restaurant_data = restaurant_data %>% mutate(Price_Range = fct_recode(
+  Price_Range,
+  "low" = "$",
+  "medium" = "$$ - $$$",
+  "high" = "$$$$"
+)) # Rename the levels
+
+```
+
+### Check duplicated and NULL values
+
+```{r}
+duplicated(restaurant_data) %>% sum()
+restaurant_data = restaurant_data %>% distinct() # Remove duplicates
+
+
+is.na(restaurant_data) %>% sum()
+sapply(restaurant_data, function(x) sum(is.na(x)))
+```
+
+## Summary
+
+```{r}
+restaurant_data
+str(restaurant_data)
+summary(restaurant_data)
+```
+
+# Visualisation
+
+## ...
+
+Beispiele zum testen ob es eh funktioniert:
+```{r}
+ggplot(restaurant_data, aes(x = Price_Range)) + geom_bar()
+ggplot(restaurant_data, aes(x = Review_Number, y = Ranking)) + geom_point(aes(col = Rating))
+```
