@@ -25,14 +25,25 @@ library(ggplot2)
 
 ## Data import from csv file
 
+Die Daten werden mit *read.csv* eingelesen, da dadurch alle Spalten richtig eingelesen werden, 
+was aufgrund der Spalte **Cuisine.Style** anders nicht so leicht geht, da diese Spalte ein
+Python List object enthält, was als Trennzeichen das Gleiche Trennzeichen verwendet wie 
+bei der Trennung der verschiedenen Spalten.
+
+Außerdem werden leere Einträge durch NA Werte ersetzt, da Funktionen mit diesen besonders umgehen können.
+
 ```{r}
 restaurant_data = read.csv(file = "restaurants_data.csv")
-restaurant_data = restaurant_data %>% na_if("") # Set empty data entries to NA
+# Set empty data entries to NA
+restaurant_data = restaurant_data %>% na_if("") 
 ```
 
 ## Clean the data
 
 ### Rename and remove columns
+
+Die Spaltennamen werden auf angenehmerer Art dargestellt und die Spalten welche keine benötigten Infos liefern e.gg
+**X**, **URL_TA** & **ID_TA** werden entfernt.
 
 ```{r}
 restaurant_data = as_tibble(restaurant_data)
@@ -40,32 +51,55 @@ restaurant_data = as_tibble(restaurant_data)
 restaurant_data = restaurant_data %>%
   rename("Cuisine_Style" = Cuisine.Style) %>%
   rename("Price_Range" = Price.Range) %>%
-  rename("Review_Number" = Number.of.Reviews)
+  rename("Review_Count" = Number.of.Reviews)
 
+# Remove useless columns
 restaurant_data = restaurant_data %>%
-  mutate(X = NULL, URL_TA = NULL, ID_TA = NULL) # Remove useless lines
+  mutate(X = NULL, URL_TA = NULL, ID_TA = NULL) 
 ```
 
 ### Correct the column types
 
-```{r}
-restaurant_data = restaurant_data %>% mutate(City = as_factor(City)) # Change from character to factor
+Die Spalte **City** wird von einer Textvariable zu einer kategorialen Faktorvariable geändert,
+da die Städte öfter vorkommen und dadurch mehr Infos aus der Spalte geholt werden können.
+Diese Variable besitzt 31 Ausprägungen
 
-restaurant_data = restaurant_data %>% mutate(Price_Range = as_factor(Price_Range)) # Change from character to factor
+Die Spalten **Price_Range** und **Rating** werden aus den selben Gründen ebenso in einen Faktor umgewandelt.
+Die Variable **Price_Range** besitzt 3 Ausprägungen, die für leichtere Verständlichkeit umbenannt werden in:
+*low*, *medium* & *high*.
+Die Variable **Rating** besitzt 9 Ausprägungen.
+
+
+```{r}
+# Change from character to factor
+restaurant_data = restaurant_data %>% mutate(City = as_factor(City)) 
+
+# Change from character to factor
+restaurant_data = restaurant_data %>% mutate(Price_Range = as_factor(Price_Range)) 
+# Rename the levels
 restaurant_data = restaurant_data %>% mutate(Price_Range = fct_recode(
   Price_Range,
-  "low" = "$",
+  "high" = "$$$$",
   "medium" = "$$ - $$$",
-  "high" = "$$$$"
-)) # Rename the levels
+  "low" = "$"
+)) 
 
+# Set invalid entries with a rating of -1 to NA
+restaurant_data$Rating = restaurant_data$Rating %>% na_if("-1") 
+# Change from character to factor
+restaurant_data = restaurant_data %>% mutate(Rating = as_factor(Rating)) 
 ```
 
 ### Check duplicated and NULL values
 
+Ursprünglich enthält der Datensatz *286* Datensätze die doppelt vorkommen. Diese werden entfernt.
+
+Insgsamt enthält der Datensatz *123992* NA Werte. Diese sind wie folgt auf die einzelnen Spalten aufgeteilt:
+
 ```{r}
 duplicated(restaurant_data) %>% sum()
-restaurant_data = restaurant_data %>% distinct() # Remove duplicates
+# Remove duplicates
+restaurant_data = restaurant_data %>% distinct() 
 
 
 is.na(restaurant_data) %>% sum()
@@ -73,6 +107,27 @@ sapply(restaurant_data, function(x) sum(is.na(x)))
 ```
 
 ## Summary
+
+Der Datensatz handelt von TripAdvisor Bewertungen vieler Restaurants von 31 europäischen Städten.
+
+Der endgültige Datensatz mit dem wir in diesem Projekt arbeiten werden besteht aus *acht* Variablen (Spalten) mit *125.238* Observationen (Zeilen).
+Diese beinhalten:
+
+**Name**: Name des Restaurants - Textvariable (unique)
+
+**City**: Stadt in der sich das Restaurant befindet - Kategoriale Faktorvariable mit 31 Ausprägungen (London mit 18113 Einträgen, Paris mit 14867 Einträgen, ...)
+
+**Cuisine_Style**: Essensrichtungen des Restaurants - Textvariable (grundsätzlich besteht diese aus mehreren Faktoren innerhalb eines Python list Objektes / 31222 NA Werte)
+
+**Ranking**: Rang des Restaurants im Vergleich zu allen anderen Restaurants in der Stadt - Diskrete Variable (Min: 1, Mean: 3658, Median: 2256, Max: 16444 / 9370 NA Werte)
+
+**Rating**: Bewertung des Restaurants von 1-5 in 0.5 Schritten - Kategoriale Faktorvariable mit 9 Ausprägungen (Bewertung 4 mit 39841 Einträgen, 4.5 mit 31325 Einträgen, ... / 9389 NA Werte)
+
+**Price_Range**: Preisbewertung - Kategoriale Faktorvariable mit 3 Ausprägungen (medium mit 54302 Einträgen, high mit 4306 Einträgen und low mit 18988 Einträgen / 47642 NA Werte)
+
+**Review_Count**: Anzahl der Reviews - Diskrete Variable (Min: 2, Mean: 125.2, Median: 32, Max: 16478 / 17062 NA Werte)
+
+**Reviews**: Zwei Reviews des Restaurants und die Daten, an dem die Reviews geschrieben wurden - Textvariable (als Python list Objekt abgespeichert)
 
 ```{r}
 restaurant_data
@@ -82,10 +137,126 @@ summary(restaurant_data)
 
 # Visualisation
 
-## ...
+**Anmerkung an Jan: Ich habe hier nirgendswo die Farben geändert, da ich es beim ersten auch ned hinbekommen habe.**
 
-Beispiele zum testen ob es eh funktioniert:
+## Anzahl der Restaurants pro Stadt
+
+Hier zu sehen ist die Verteilung der Anzahl der Restaurants pro Stadt absteigend geordnet.
+Zusätzlich ist noch die Verteilung der Preis Einteilung pro Stadt zu sehen. 
+
+Gut zu sehen ist, dass in dem Datensatz Städte wie *London*, *Paris* sehr viele Restaurants besitzen. (Bereich ~15.000+)
+Danach ist ein stärkerer Abfall an Vorkommnissen zu sehen und die Städte *Luxenburg* und *Ljubljana* besitzen am wenigsten Restuarants hier. (<1000)
+
+Auch zu erkennen ist, dass die meisten Restaurants in so gut wie allen Städten in die Preis Klasse *medium* fallen. Am wenigsten Restaurants sind in der Klasse *high*.
+Der Anteil an nicht klassifizierter Restaurants (NA) ist sehr hoch und ist ein beträchtlicher Anteil.
+
 ```{r}
-ggplot(restaurant_data, aes(x = Price_Range)) + geom_bar()
-ggplot(restaurant_data, aes(x = Review_Number, y = Ranking)) + geom_point(aes(col = Rating))
+city_price_graph <-
+  mutate(restaurant_data, City = fct_infreq(City)) %>%
+  ggplot(aes(x = City)) + geom_bar(aes(col = Price_Range))
+
+city_price_graph + ggtitle("Anzahl der Restaurants pro Stadt",
+                           subtitle = paste0("Anzahl der Datensätze: ",
+                                             length(which(
+                                               !is.na(restaurant_data$City)
+                                             )))) +
+  xlab("Stadt") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() +
+  theme(axis.text.x = element_text(
+    angle = 90,
+    vjust = 0.5,
+    hjust = 1
+  ))
 ```
+
+## Anzahl der Restaurants Ratings
+
+Hier zu sehen ist die Verteilung der Anzahl der Rating Stufen.
+
+Gut zu erkennen ist, dass die Ratings 4 und 4.5 am häufigsten gegeben werden und Ratings wie 3 oder 5 viel seltener.
+Ratings <= 2.5 kommen am seltensten vor. Dies könnte sich dadurch erklären lassen, dass diese Restaurants sich nicht besonders gut halten werden und wahrscheinlich öfters schließen müssen als Restauraunts mit besseren Bewertungen.
+
+```{r}
+ratings_graph = restaurant_data %>%
+  filter(!is.na(Rating)) %>%
+  ggplot(aes(x = Rating)) + geom_bar()
+
+ratings_graph + ggtitle("Anzahl der Restaurant Ratings Stufen",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Rating)
+                        )))) +
+  xlab("Rating Ebene") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw()
+```
+
+## Anzahl der Restaurant Ratings pro Preisklasse
+
+Hier zu sehen ist die Verteilung der Anzahl der Rating Stufen pro Preisklasse.
+
+Es ist ersichtlich, dass Restaurants mit einer niedrigen Preisklasse tendenziell eher weniger hohe Bewertungen haben (im Vergleich zu den anderen Preisklassen)
+Restaurants in einer hohen Preisklasse hingegen besitzen höhere Ratings welche im Schnitt 4 oder höher sind.
+
+Ein weiteres interessantes Merkmal ist, dass Restaurants ohne Preisklasseneinstufung tendenziell viel mehr 5 Sterne Bewertungen haben.
+Dies kann entweder ein statistischer Zufall sein oder es könnte daran liegen, dass diese Restaurants nicht traditionell in Preisklassen eingeteilt werden können und dadurch Leute besser ansprechen (was aber eher weit hergeholt ist).
+
+```{r}
+ratings_price_graph = restaurant_data %>%
+  filter(!is.na(Rating)) %>%
+  ggplot(aes(x = Rating)) + geom_bar() + facet_wrap( ~Price_Range)
+
+ratings_price_graph + ggtitle("Anzahl der Restaurant Ratings Stufen pro Preisklasse",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Rating)
+                        )))) +
+  xlab("Rating Ebene") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw()
+```
+
+## Review Anzahl
+
+Hier zu sehen ist die Verteilung der Anzahl der Review Bewertungen.
+
+Dieser Graph gruppiert auf der x-Achse die Anzahl der Reviews in 50er Blöcke und stellt davon die Anzahl der Vorkommnisse auf der y-Achse dar.
+
+Hier kann man stark betrachten, dass die Verteilung stark rechts fallend ist und die meisten Vorkommnisse in die Kategorie von 0-50 Reviews fallen.
+Dies bedeutet, dass die meisten Restaurants wenig Reviews haben und das nur noch ein sehr kleiner Anteil an Restaurants mehr als 500 Reviews haben.
+
+```{r}
+reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% ggplot(aes(x = Review_Count)) + geom_histogram(binwidth = 50)
+
+reviewCount_graph + ggtitle("Verteilung der Review Anzahl",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Review_Count)
+                        )), " | Binwidth = 50")) +
+  xlab("Review Anzahl Kategorie") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() +
+  xlim(0, 2500) + ylim(0, 25000)
+
+
+```
+
+## Restaurant Ranking erklärt durch Review Anzahl
+
+Hier zu sehen ist die Verteilung des Rankings von Restaurants erklärt durch die Review Anzahl.
+
+Es ist eindeutig ersichtlich, dass Restaurants welche ein hohes Ranking in ihrer Stadt haben, eine dementsprechend höhere Anzahl an Reviews hat.
+Dies kann sich dadurch erklären lassen, dass Top-Restaurants öfters besucht werden und dadurch mehr Leute auch eine Bewertung schreiben.
+
+```{r}
+ranking_reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% filter(!is.na(Ranking)) %>% ggplot(aes(x = Review_Count, y = Ranking)) + 
+  geom_point() + geom_smooth(method = "gam")
+
+ranking_reviewCount_graph + ggtitle("Restaurant Ranking erklärt durch Review Anzahl",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Ranking)
+                        )))) +
+  xlab("Review Anzahl") +
+  ylab("Ranking des Restaurants") +
+  theme_bw() +
+  scale_y_continuous(trans = "reverse", limits = c(17000, 1))
+```
+
