@@ -153,7 +153,9 @@ Der Anteil an nicht klassifizierter Restaurants (NA) ist sehr hoch und ist ein b
 ```{r}
 city_price_graph <-
   mutate(restaurant_data, City = fct_infreq(City)) %>%
-  ggplot(aes(x = City)) + geom_bar(aes(col = Price_Range))
+  mutate(Price_Range = fct_relevel(Price_Range,
+                                   "high", "medium", "low")) %>%
+  ggplot(aes(x = City)) + geom_bar(aes(fill = Price_Range))
 
 city_price_graph + ggtitle("Anzahl der Restaurants pro Stadt",
                            subtitle = paste0("Anzahl der Datensätze: ",
@@ -167,7 +169,8 @@ city_price_graph + ggtitle("Anzahl der Restaurants pro Stadt",
     angle = 90,
     vjust = 0.5,
     hjust = 1
-  ))
+  )) + 
+  scale_fill_brewer(type = "qual", palette = 4, na.value = "grey50")
 ```
 
 ## Anzahl der Restaurants Ratings
@@ -180,7 +183,7 @@ Ratings <= 2.5 kommen am seltensten vor. Dies könnte sich dadurch erklären las
 ```{r}
 ratings_graph = restaurant_data %>%
   filter(!is.na(Rating)) %>%
-  ggplot(aes(x = Rating)) + geom_bar()
+  ggplot(aes(x = Rating)) + geom_bar(aes(fill = Rating))
 
 ratings_graph + ggtitle("Anzahl der Restaurant Ratings Stufen",
                         subtitle = paste0("Anzahl der Datensätze: ", length(which(
@@ -188,7 +191,8 @@ ratings_graph + ggtitle("Anzahl der Restaurant Ratings Stufen",
                         )))) +
   xlab("Rating Ebene") +
   ylab("Anzahl der Vorkommnisse") +
-  theme_bw()
+  theme_bw() + 
+  scale_fill_brewer(type = "seq", palette = 3)
 ```
 
 ## Anzahl der Restaurant Ratings pro Preisklasse
@@ -204,7 +208,7 @@ Dies kann entweder ein statistischer Zufall sein oder es könnte daran liegen, d
 ```{r}
 ratings_price_graph = restaurant_data %>%
   filter(!is.na(Rating)) %>%
-  ggplot(aes(x = Rating)) + geom_bar() + facet_wrap( ~Price_Range)
+  ggplot(aes(x = Rating)) + geom_bar(aes(fill = Rating)) + facet_wrap( ~Price_Range)
 
 ratings_price_graph + ggtitle("Anzahl der Restaurant Ratings Stufen pro Preisklasse",
                         subtitle = paste0("Anzahl der Datensätze: ", length(which(
@@ -212,7 +216,8 @@ ratings_price_graph + ggtitle("Anzahl der Restaurant Ratings Stufen pro Preiskla
                         )))) +
   xlab("Rating Ebene") +
   ylab("Anzahl der Vorkommnisse") +
-  theme_bw()
+  theme_bw() + 
+  scale_fill_brewer(type = "seq", palette = 3)
 ```
 
 ## Review Anzahl
@@ -225,18 +230,17 @@ Hier kann man stark betrachten, dass die Verteilung stark rechts fallend ist und
 Dies bedeutet, dass die meisten Restaurants wenig Reviews haben und das nur noch ein sehr kleiner Anteil an Restaurants mehr als 500 Reviews haben.
 
 ```{r}
-reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% ggplot(aes(x = Review_Count)) + geom_histogram(binwidth = 50)
+reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% ggplot(aes(x = Review_Count)) + geom_histogram(aes(fill=stat(count)), binwidth = 50)
 
 reviewCount_graph + ggtitle("Verteilung der Review Anzahl",
                         subtitle = paste0("Anzahl der Datensätze: ", length(which(
                           !is.na(restaurant_data$Review_Count)
                         )), " | Binwidth = 50")) +
-  xlab("Review Anzahl Kategorie") +
+  xlab("Review Anzahl") +
   ylab("Anzahl der Vorkommnisse") +
   theme_bw() +
-  xlim(0, 2500) + ylim(0, 25000)
-
-
+  xlim(0, 2500) + ylim(0, 25000) +
+  scale_fill_distiller(type = "seq", palette = 5)
 ```
 
 ## Restaurant Ranking erklärt durch Review Anzahl
