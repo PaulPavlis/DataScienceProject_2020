@@ -20,6 +20,12 @@ rm(list = ls())
 ```{r}
 library(tidyverse)
 library(ggplot2)
+library(caret)
+library(randomForest)
+library(e1071)
+library(nnet)
+library(rpart)
+library(keras)
 ```
 # Data wrangling
 
@@ -106,7 +112,7 @@ is.na(restaurant_data) %>% sum()
 sapply(restaurant_data, function(x) sum(is.na(x)))
 ```
 
-## Summary
+# Explorative Datenanalyse
 
 Der Datensatz handelt von TripAdvisor Bewertungen vieler Restaurants von 31 europäischen Städten.
 
@@ -134,10 +140,6 @@ restaurant_data
 str(restaurant_data)
 summary(restaurant_data)
 ```
-
-# Visualisation
-
-**Anmerkung an Jan: Ich habe hier nirgendswo die Farben geändert, da ich es beim ersten auch ned hinbekommen habe.**
 
 ## Anzahl der Restaurants pro Stadt
 
@@ -251,16 +253,340 @@ Es ist eindeutig ersichtlich, dass Restaurants welche ein hohes Ranking in ihrer
 Dies kann sich dadurch erklären lassen, dass Top-Restaurants öfters besucht werden und dadurch mehr Leute auch eine Bewertung schreiben.
 
 ```{r}
-ranking_reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% filter(!is.na(Ranking)) %>% ggplot(aes(x = Review_Count, y = Ranking)) + 
-  geom_point() + geom_smooth(method = "gam")
-
-ranking_reviewCount_graph + ggtitle("Restaurant Ranking erklärt durch Review Anzahl",
-                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
-                          !is.na(restaurant_data$Ranking)
-                        )))) +
-  xlab("Review Anzahl") +
-  ylab("Ranking des Restaurants") +
-  theme_bw() +
-  scale_y_continuous(trans = "reverse", limits = c(17000, 1))
+# ranking_reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% filter(!is.na(Ranking)) %>% ggplot(aes(x = Review_Count, y = Ranking)) + 
+#   geom_point() + geom_smooth(method = "gam")
+# 
+# ranking_reviewCount_graph + ggtitle("Restaurant Ranking erklärt durch Review Anzahl",
+#                         subtitle = paste0("Anzahl der Datensätze: ", length(which(
+#                           !is.na(restaurant_data$Ranking)
+#                         )))) +
+#   xlab("Review Anzahl") +
+#   ylab("Ranking des Restaurants") +
+#   theme_bw() +
+#   scale_y_continuous(trans = "reverse", limits = c(17000, 1))
 ```
+
+# Modellierung 
+
+Auswahl des Merkmals zur Vorhersage:
+
+Auswahl: Ranking
+
+Das Ranking sollte ein gutes Merkmal für die Vorhersage sein, da dieser gut durch die anderen Parameter vorhersagbar sein sollte (in gewissen Grenzen) und da er recht interessant für neue Restaurants ist.
+
+Dadurch könnte man dann schauen, in welcher Stadt es sich auszahlen würde, Restaurants zu öffnen, anhand des jeweiligen Rankings im Vergleich zu den anderen Restaurants in der Stadt.
+
+Außerdem hatten wir in der LV und bei den Übungen sehr viel mit Klassifikation zu tun und wollten dies auch einmal mit einem Reggressionsbeispiel durchprobieren.
+
+## Spezielle Aufbereitung
+
+Name und Reviewtext bringen keinen Mehrwert beim Vorhersagen und werden deswegen im ersten Schritt entfernt.
+Zusätzlich werden, da genügend viele Daten vorhanden sind, im nächsten Schritt alle Daten rausgehaut, bei denen Werte fehlen.
+
+```{r}
+data_not_null = mutate(restaurant_data, Name = NULL, Reviews = NULL, Cuisine_Style = NULL) %>% drop_na()
+```
+
+## Trainings- und Testdaten kreieren
+
+```{r}
+N = nrow(data_not_null)
+train_ind = sample(1 : N, size = N * 2/3)
+trainData = data_not_null[train_ind,]
+testData = data_not_null[-train_ind,]
+```
+
+```{r}
+pp = preProcess(trainData, method = c("center", "scale"))
+trainData_scaled = predict(pp, trainData)
+testData_scaled = predict(pp, testData)
+```
+
+## Linear Regression
+
+Nicht eine von den drei erforderlichen Methoden. Wurde aus Interesse gemacht. Sie ist (wie erwartet) nicht so gut für diesen Anwendungsfall. Eventuell könnte sie noch mehr getuned werden, allerdings sind andere Methoden für diesen Fall attraktiver und (für uns) spannender.
+
+```{r}
+m_linearRegression = lm(Ranking ~ ., data = trainData_scaled)
+
+# summary(m_linearRegression)
+```
+
+### Berechnung Training Error
+
+```{r}
+fitted_linearRegression = predict(m_linearRegression, trainData_scaled)
+train_error_linearRegression = mean((fitted_linearRegression - trainData_scaled$Ranking)^2)
+
+train_error_linearRegression
+```
+
+### Berechnung Gerneralization Error
+
+```{r}
+pred_linearRegression = predict(m_linearRegression, testData_scaled)
+test_error_linearRegression = mean((pred_linearRegression - testData_scaled$Ranking)^2)
+
+test_error_linearRegression
+```
+
+## Tree Modell (rpart)
+
+```{r}
+# m_rpart = rpart(Ranking ~., trainData_scaled)
+```
+
+### Parameter Tuning
+
+Getestet zwischen:
+Minimale Anzahl in Node bevor Split: 5 - 100
+Minimale Anzahl in Node: 5 - 100
+
+Beste Parameter beim Erstelldruchgang: Keine Verbesserung -> Nehmen von 50 in einer Node (minbucket)
+
+```{r}
+# tune_rpart = tune.rpart(Ranking ~ ., data = trainData_scaled,
+#                                       # # Dauert recht lange, man sieht aber schön
+#                                       # # wo die Grenzen sind
+#                                       # minsplit = seq(1, 10000, by = 100),
+#                                       # minbucket = seq(1, 10000, by = 100),
+#                                       minsplit = seq(5, 100, by = 5),
+#                                       minbucket = seq(5, 100, by = 2),
+#                                       tunecontrol = tune.control(sampling = "fix",
+#                                                fix = 2/3))
+# 
+# 
+# tune_rpart
+# plot(tune_rpart, color.palette = topo.colors)
+```
+
+### Erstellung des getunten Modells
+
+```{r}
+m_rpart = rpart(Ranking ~ ., data = trainData_scaled, minbucket = 50)
+```
+
+### Berechnung Training Error
+
+```{r}
+fitted_rpart = predict(m_rpart, trainData_scaled)
+train_error_rpart = mean((fitted_rpart - trainData_scaled$Ranking)^2)
+
+train_error_rpart
+```
+
+### Berechnung Gerneralization Error
+
+```{r}
+pred_rpart = predict(m_rpart, testData_scaled)
+test_error_rpart = mean((pred_rpart - testData_scaled$Ranking)^2)
+
+test_error_rpart
+```
+
+## RandomForest
+
+```{r}
+# m_randomForest = randomForest(Ranking ~ ., data = trainData_scaled, importance = TRUE, ntree = 100)
+```
+
+### Parameter Tuning
+
+Getestet zwischen:
+Anzahl der Bäume: 50 - 500
+Minimale Größe der einzelnen Nodes: 10 - 1000
+
+Beste Parameter beim Erstelldruchgang: nodesize: 40 | ntree: 100
+
+```{r}
+# tune_randomForest = tune.randomForest(Ranking ~ ., data = trainData_scaled,
+#                                       ntree = seq(50, 500, by = 20),
+#                                       nodesize = seq(10, 100, by = 10),
+#                                       tunecontrol = tune.control(sampling = "fix",
+#                                                fix = 2/3))
+# 
+# 
+# tune_randomForest
+# plot(tune_randomForest, color.palette = topo.colors)
+```
+
+### Erstellung des getunten Modells
+
+```{r}
+m_randomForest = randomForest(Ranking ~ ., data = trainData_scaled, importance = TRUE, ntree = 100, nodesize = 40)
+```
+
+### Berechnung Training Error
+
+```{r}
+fitted_randomForest = predict(m_randomForest, trainData_scaled)
+train_error_randomForest = mean((fitted_randomForest - trainData_scaled$Ranking)^2)
+
+train_error_randomForest
+```
+
+### Berechnung Gerneralization Error
+
+```{r}
+pred_randomForest = predict(m_randomForest, testData_scaled)
+test_error_randomForest = mean((pred_randomForest - testData_scaled$Ranking)^2)
+
+test_error_randomForest
+```
+
+
+## NNet
+
+Testen des nnet Modells um den Unterschied nochmals zu verdeutlichen zwischen der Qualität von nnet und keras.
+(Abgesehen von dem enormen Zeitunterschied)
+
+```{r}
+# m_nnet = nnet(Ranking ~ ., data = trainData_scaled, size = 10, lineout = TRUE, decay = 0.2, MaxNWts = 5000)
+```
+
+Getestet zwischen:
+Size: 10 - 500
+decay: 0.05 - 0.3
+
+Beste Parameter beim Erstelldruchgang: size: 90 | decay: 0.1
+
+```{r}
+# tune_nnet = tune.nnet(
+#   Ranking ~ .,
+#   data = trainData_scaled,
+#   MaxNWts = 30000,
+#   lineout = TRUE,
+#   size = seq(10, 500, by = 80),
+#   decay = seq(0.05, 0.3, by = 0.05),
+#   tunecontrol = tune.control(sampling = "fix",
+#                              fix = 2 / 3)
+# )
+# 
+# tune_nnet
+# plot(tune_nnet, color.palette = topo.colors)
+```
+
+### Erstellung des getunten Modells
+
+***Auskommentiert, da es recht lange braucht***
+
+```{r}
+# m_nnet = nnet(Ranking ~ ., data = trainData_scaled, size = 90, lineout = TRUE, decay = 0.1, MaxNWts = 5000)
+```
+
+### Berechnung Training Error
+
+```{r}
+# fitted_nnet = predict(m_nnet, trainData_scaled)
+# train_error_nnet = mean((fitted_nnet - trainData_scaled$Ranking)^2)
+# 
+# train_error_nnet
+```
+
+### Berechnung Gerneralization Error
+
+```{r}
+# pred_nnet = predict(m_nnet, testData_scaled)
+# test_error_nnet = mean((pred_nnet - testData_scaled$Ranking)^2)
+# 
+# test_error_nnet
+```
+
+## Neural Network (keras -> tensorflow)
+
+### Binary Coding the factors
+
+Eventuell ist es nicht so besonders gut so etwas wie die Stadt hier reinzugeben, da diese unglaublich viele Ausprägungen hat. Generell sind drei Faktoren recht viel.
+
+```{r}
+trainData_bcoded_City = to_categorical(as.integer(trainData_scaled$City) - 1)
+trainData_bcoded_Rating = to_categorical(as.integer(trainData_scaled$Rating) - 1)
+trainData_bcoded_Price_Range = to_categorical(as.integer(trainData_scaled$Price_Range) - 1)
+
+trainData_bound = cbind(
+  trainData_bcoded_City,
+  trainData_bcoded_Rating,
+  trainData_bcoded_Price_Range,
+  trainData_scaled$Review_Count
+)
+trainData_labels = trainData_scaled$Ranking
+
+# str(trainData_scaled)
+# 31 + 9 + 3 + 1 = 44 --> input Shape
+```
+### Basic model
+
+```{r}
+m_nn_keras <- keras_model_sequential()
+m_nn_keras %>% 
+  layer_dense(units = 100, activation = "sigmoid", input_shape = c(44)) %>% 
+  # layer_dropout(rate = 0.3) %>%
+  # layer_dense(units = 100, activation = "sigmoid") %>% 
+  # layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 1, activation = "softmax")
+```
+
+### Compile the model
+
+```{r}
+m_nn_keras %>% compile(
+  loss = "mean_squared_error",
+  optimizer = optimizer_rmsprop(),
+  metrics = c("accuracy")
+)
+summary(m_nn_keras)
+```
+
+### Fit train data
+
+```{r}
+history_nn_keras <- m_nn_keras %>% fit(
+  trainData_bound, trainData_labels, 
+  epochs = 10, batch_size = 1000, 
+  validation_split = 0.2
+)
+plot(history_nn_keras)
+```
+
+
+### Parameter Tuning
+
+Getestet zwischen:
+
+Beste Parameter beim Erstelldruchgang: 
+
+```{r}
+
+```
+
+### Erstellung des getunten Modells
+
+```{r}
+
+```
+
+### Berechnung Training Error
+
+```{r}
+# fitted_randomForest = predict(m_randomForest, trainData_scaled)
+# train_error_randomForest = mean((fitted_randomForest - trainData_scaled$Ranking)^2)
+# 
+# train_error_randomForest
+```
+
+### Berechnung Gerneralization Error
+
+```{r}
+# pred_randomForest = predict(m_randomForest, testData_scaled)
+# test_error_randomForest = mean((pred_randomForest - testData_scaled$Ranking)^2)
+# 
+# test_error_randomForest
+```
+
+
+
+
+
+
+
 
