@@ -7,7 +7,7 @@ library(dplyr)
 library(caret)
 library(keras)
 
-setwd("C:/Users/Jaymes Barker/Technikum/5 sem/DAS/DataScienceProject_2020")
+setwd("PathTo/DataScienceProject_2020")
 
 load("variables.rda")
 keras_model <- load_model_tf("model/")
