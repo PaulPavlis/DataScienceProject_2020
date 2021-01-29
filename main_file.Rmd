@@ -302,6 +302,19 @@ trainData_scaled = predict(pp, trainData)
 testData_scaled = predict(pp, testData)
 ```
 
+Leider wurde hier nicht anfänglich berücksicht, dass nur die Prediktoren preProcessed werden sollen.
+Dadurch sind die Ergebnisse der Modelle auch centered und skaliert. 
+Um dies auszugleichen wurde eine Funktion geschrieben, die den Prozess der predicted Variablen umwandelt um
+dadurch menschlich lesbare Ergebnisse zu erhalten.
+
+```{r}
+unPreProc <- function(preProc, data){
+  data <- data[, 1] * preProc$std[[1]] + preProc$mean[[1]]
+  return(data)
+}
+```
+
+
 ## Linear Regression
 
 Nicht eine von den drei erforderlichen Methoden. Wurde aus Interesse gemacht. Sie ist (wie erwartet) nicht so gut für diesen Anwendungsfall. Eventuell könnte sie noch mehr getuned werden, allerdings sind andere Methoden für diesen Fall attraktiver und (für uns) spannender.
