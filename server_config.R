@@ -10,19 +10,20 @@ library(keras)
 setwd("C:/Users/Jaymes Barker/Technikum/5 sem/DAS/DataScienceProject_2020")
 
 load("variables.rda")
-load("keras_model.rda")
+keras_model <- load_model_tf("model/")
 
 decode <- function(s)
 {
     input_data <- as.data.frame(fromJSON(s$postBody)) %>%
 		mutate(City = factor(City, levels = levels_city)) %>% 
 		mutate(Price_Range = factor(Price_Range, levels = levels_price_range)) %>%
-		mutate(Rating = factor(Rating, levels = levels_rating))
+		mutate(Rating = factor(Rating, levels = levels_rating)) %>%
+		mutate(Ranking = 0)
 }
 
 scaleAndBcode <- function(s)
 {
-	scaled <- predict(pp, s)
+	scaled <- try(predict(pp, s))
 	data_bcoded_City = matrix(to_categorical(as.integer(scaled$City) - 1, num_classes = length(levels_city)), nrow=nrow(s))
 	data_bcoded_Rating = matrix(to_categorical(as.integer(scaled$Rating) - 1, num_classes = length(levels_rating)), nrow=nrow(s))
 	data_bcoded_Price_Range = matrix(to_categorical(as.integer(scaled$Price_Range) - 1, num_classes = length(levels_price_range)), nrow = nrow(s))
@@ -40,6 +41,7 @@ scaleAndBcode <- function(s)
 function(req)
 {
 	data_frame <- decode(req)
-	data_frame <- scaleAndBcode(data_frame)
-	as.character(try(predict(m_nn_keras, data_frame)))
+	data_bounded <- scaleAndBcode(data_frame)
+	rating_scaled <- try(predict(keras_model, data_bounded))
+	as.character(unPreProc(pp, rating_scaled))
 }

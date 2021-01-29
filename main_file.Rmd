@@ -1,6 +1,6 @@
 ---
 title: "DataSience_FinalProject"
-author: "Jan Steinwender & Paul Pavlis"
+author: "Jan-Philipp Steinwender & Paul Pavlis"
 date: "2020-10-28"
 output: pdf_document
 ---
@@ -39,7 +39,7 @@ bei der Trennung der verschiedenen Spalten.
 Außerdem werden leere Einträge durch NA Werte ersetzt, da Funktionen mit diesen besonders umgehen können.
 
 ```{r}
-restaurant_data = read.csv(file = "restaurants_data.csv")
+restaurant_data = read.csv(file = "restaurants_data.csv", encoding = "UTF-8")
 # Set empty data entries to NA
 restaurant_data = restaurant_data %>% na_if("") 
 ```
@@ -772,7 +772,7 @@ m_nn_keras %>% compile(
   metrics = c("mean_absolute_error")
 )
 summary(m_nn_keras)
-save(m_nn_keras, file="keras_model.rda")
+save_model_tf(m_nn_keras, "model/")
 
 history_nn_keras <- m_nn_keras %>% fit(
   trainData_bound, trainData_labels, 
@@ -816,7 +816,7 @@ levels_city = levels(trainData_scaled$City)
 levels_price_range = levels(trainData_scaled$Price_Range)
 levels_rating = levels(trainData_scaled$Rating)
 
-save(levels_city, levels_price_range, levels_rating, pp, file="variables.rda")
+save(levels_city, levels_price_range, levels_rating, pp, unPreProc, file="variables.rda")
 ```
 
 
