@@ -116,7 +116,7 @@ sapply(restaurant_data, function(x) sum(is.na(x)))
 
 Der Datensatz handelt von TripAdvisor Bewertungen vieler Restaurants von 31 europäischen Städten.
 
-Der endgültige Datensatz mit dem wir in diesem Projekt arbeiten werden besteht aus *acht* Variablen (Spalten) mit *125.238* Observationen (Zeilen).
+Der endgültige Datensatz mit dem wir in diesem Projekt arbeiten werden, besteht aus *acht* Variablen (Spalten) mit *125.238* Observationen (Zeilen).
 Diese beinhalten:
 
 **Name**: Name des Restaurants - Textvariable (unique)
@@ -205,7 +205,7 @@ Es ist ersichtlich, dass Restaurants mit einer niedrigen Preisklasse tendenziell
 Restaurants in einer hohen Preisklasse hingegen besitzen höhere Ratings welche im Schnitt 4 oder höher sind.
 
 Ein weiteres interessantes Merkmal ist, dass Restaurants ohne Preisklasseneinstufung tendenziell viel mehr 5 Sterne Bewertungen haben.
-Dies kann entweder ein statistischer Zufall sein oder es könnte daran liegen, dass diese Restaurants nicht traditionell in Preisklassen eingeteilt werden können und dadurch Leute besser ansprechen (was aber eher weit hergeholt ist).
+Dies kann entweder ein statistischer Zufall sein oder es könnte daran liegen, dass diese Restaurants nicht in traditionelle Preisklassen eingeteilt werden können und dadurch Leute besser ansprechen (was aber eher weit hergeholt ist).
 
 ```{r}
 ratings_price_graph = restaurant_data %>%
@@ -272,7 +272,7 @@ Auswahl des Merkmals zur Vorhersage:
 
 Auswahl: Ranking
 
-Das Ranking sollte ein gutes Merkmal für die Vorhersage sein, da dieser gut durch die anderen Parameter vorhersagbar sein sollte (in gewissen Grenzen) und da er recht interessant für neue Restaurants ist.
+Das Ranking sollte ein gutes Merkmal für die Vorhersage sein, da dieser gut durch die anderen Parameter vorhersagbar sein sollte (in gewissen Grenzen) und da er recht interessant für neue Restaurants sein könnte.
 
 Dadurch könnte man dann schauen, in welcher Stadt es sich auszahlen würde, Restaurants zu öffnen, anhand des jeweiligen Rankings im Vergleich zu den anderen Restaurants in der Stadt.
 
@@ -759,6 +759,7 @@ m_nn_keras %>% compile(
   metrics = c("mean_absolute_error")
 )
 summary(m_nn_keras)
+save(m_nn_keras, file="keras_model.rda")
 
 history_nn_keras <- m_nn_keras %>% fit(
   trainData_bound, trainData_labels, 
@@ -793,6 +794,17 @@ test_error_nn_keras
 
 Für unseren Fall der Reggression würden wir uns für das getunte Model von keras/tensorflow entscheiden, da dieses den geringsten Error aufweist. Baummodelle waren ebenfalls akzeptabel mit um die 20% Error, allerdings war das Neuronale Netz um zirka 8-10% besser.
 
+## REST vorbeireitung
+
+Für den REST Server werden einige Variablen benötigt. Diese werden hier exportiert.
+
+```{r}
+levels_city = levels(trainData_scaled$City)
+levels_price_range = levels(trainData_scaled$Price_Range)
+levels_rating = levels(trainData_scaled$Rating)
+
+save(levels_city, levels_price_range, levels_rating, pp, file="variables.rda")
+```
 
 
 
