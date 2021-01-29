@@ -536,32 +536,32 @@ testData_labels = testData_scaled$Ranking
 
 ```{r}
 library(keras) # Weniger oft eine Fehlermeldung wenn man sie nochmal aufruft
-m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
-  layer_dense(units = 100, activation = "sigmoid", input_shape = c(44)) %>% 
-  layer_dense(units = 1, activation = "sigmoid")
+# m_nn_keras <- keras_model_sequential()
+# m_nn_keras %>% 
+#   layer_dense(units = 100, activation = "sigmoid", input_shape = c(44)) %>% 
+#   layer_dense(units = 1, activation = "sigmoid")
 ```
 
 ### Compile the model
 
 ```{r}
-m_nn_keras %>% compile(
-  loss = "mse",
-  optimizer = optimizer_rmsprop(),
-  metrics = c("mean_absolute_error")
-)
-summary(m_nn_keras)
+# m_nn_keras %>% compile(
+#   loss = "mse",
+#   optimizer = optimizer_rmsprop(),
+#   metrics = c("mean_absolute_error")
+# )
+# summary(m_nn_keras)
 ```
 
 ### Fit train data
 
 ```{r}
-history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  epochs = 10, batch_size = 100, 
-  validation_split = 0.2
-)
-plot(history_nn_keras)
+# history_nn_keras <- m_nn_keras %>% fit(
+#   trainData_bound, trainData_labels, 
+#   epochs = 10, batch_size = 100, 
+#   validation_split = 0.2
+# )
+# plot(history_nn_keras)
 ```
 
 ### Parameter Tuning
@@ -569,35 +569,35 @@ plot(history_nn_keras)
 #### Testen von anderen activation functions
 
 ```{r}
-m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
-  # layer_dense(units = 100, activation = "relu", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "relu")
-  # layer_dense(units = 100, activation = "softplus", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "softplus")
-  # layer_dense(units = 100, activation = "exponential", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "exponential")
-  # layer_dense(units = 100, activation = "softsign", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "softsign")
-  layer_dense(units = 100, activation = "selu", input_shape = c(44)) %>%
-  layer_dense(units = 1, activation = "selu")
-  # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "elu")
-  # layer_dense(units = 100, activation = "exponential", input_shape = c(44)) %>%
-  # layer_dense(units = 1, activation = "exponential")
-
-m_nn_keras %>% compile(
-  loss = "mse",
-  optimizer = optimizer_rmsprop(),
-  metrics = c("mean_absolute_error")
-)
-
-history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  epochs = 10, batch_size = 100, 
-  validation_split = 0.2
-)
-plot(history_nn_keras)
+# m_nn_keras <- keras_model_sequential()
+# m_nn_keras %>% 
+#   # layer_dense(units = 100, activation = "relu", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "relu")
+#   # layer_dense(units = 100, activation = "softplus", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "softplus")
+#   # layer_dense(units = 100, activation = "exponential", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "exponential")
+#   # layer_dense(units = 100, activation = "softsign", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "softsign")
+#   layer_dense(units = 100, activation = "selu", input_shape = c(44)) %>%
+#   layer_dense(units = 1, activation = "selu")
+#   # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "elu")
+#   # layer_dense(units = 100, activation = "exponential", input_shape = c(44)) %>%
+#   # layer_dense(units = 1, activation = "exponential")
+# 
+# m_nn_keras %>% compile(
+#   loss = "mse",
+#   optimizer = optimizer_rmsprop(),
+#   metrics = c("mean_absolute_error")
+# )
+# 
+# history_nn_keras <- m_nn_keras %>% fit(
+#   trainData_bound, trainData_labels, 
+#   epochs = 10, batch_size = 100, 
+#   validation_split = 0.2
+# )
+# plot(history_nn_keras)
 ```
 
 **Elu oder Selu sollten als Activation Parameter weiterverwendet und optimiert werden**
@@ -611,30 +611,30 @@ Ergebnis: Bereich unter 300 sollte weiter getestet werden
 Erkenntnis: Selu braucht bei uns niedrigere Start Units (Unter 200), damit es nicht auswendig lernt.
 
 ```{r}
-m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
-  layer_dense(units = 10000, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 1000, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 500, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 300, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 200, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 100, activation = "selu", input_shape = c(44)) %>%
-  # layer_dense(units = 50, activation = "selu", input_shape = c(44)) %>%
-  layer_dense(units = 1, activation = "selu")
-
-m_nn_keras %>% compile(
-  loss = "mse",
-  optimizer = optimizer_rmsprop(),
-  metrics = c("mean_absolute_error")
-)
-summary(m_nn_keras)
-
-history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  epochs = 10, batch_size = 100, 
-  validation_split = 0.2
-)
-plot(history_nn_keras)
+# m_nn_keras <- keras_model_sequential()
+# m_nn_keras %>% 
+#   layer_dense(units = 10000, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 1000, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 500, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 300, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 200, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 100, activation = "selu", input_shape = c(44)) %>%
+#   # layer_dense(units = 50, activation = "selu", input_shape = c(44)) %>%
+#   layer_dense(units = 1, activation = "selu")
+# 
+# m_nn_keras %>% compile(
+#   loss = "mse",
+#   optimizer = optimizer_rmsprop(),
+#   metrics = c("mean_absolute_error")
+# )
+# summary(m_nn_keras)
+# 
+# history_nn_keras <- m_nn_keras %>% fit(
+#   trainData_bound, trainData_labels, 
+#   epochs = 10, batch_size = 100, 
+#   validation_split = 0.2
+# )
+# plot(history_nn_keras)
 ```
 
 #### Testen von batch-size
@@ -642,27 +642,27 @@ plot(history_nn_keras)
 Ergebnis: Batch-size sollte sehr niedrig sein (Dafür braucht es auch länger): Unter 20 am Besten
 
 ```{r}
-m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
-  layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  layer_dense(units = 1, activation = "elu")
-
-m_nn_keras %>% compile(
-  loss = "mse",
-  optimizer = optimizer_rmsprop(),
-  metrics = c("mean_absolute_error")
-)
-summary(m_nn_keras)
-
-history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  # epochs = 10, batch_size = 10, 
-  # epochs = 10, batch_size = 50,
-  epochs = 10, batch_size = 100,
-  # epochs = 10, batch_size = 1000, 
-  validation_split = 0.2
-)
-plot(history_nn_keras)
+# m_nn_keras <- keras_model_sequential()
+# m_nn_keras %>% 
+#   layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   layer_dense(units = 1, activation = "elu")
+# 
+# m_nn_keras %>% compile(
+#   loss = "mse",
+#   optimizer = optimizer_rmsprop(),
+#   metrics = c("mean_absolute_error")
+# )
+# summary(m_nn_keras)
+# 
+# history_nn_keras <- m_nn_keras %>% fit(
+#   trainData_bound, trainData_labels, 
+#   # epochs = 10, batch_size = 10, 
+#   # epochs = 10, batch_size = 50,
+#   epochs = 10, batch_size = 100,
+#   # epochs = 10, batch_size = 1000, 
+#   validation_split = 0.2
+# )
+# plot(history_nn_keras)
 ```
 
 #### Test: Deep Learning
@@ -671,67 +671,67 @@ Erkanntes Merkmal: Auch nach über 100 Epochen entsteht kein Overfitting.
 Allerdings gibt es meistens ab der 30 Epoche keine Verbesserung mehr.
 
 ```{r}
-m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
-  # Versuch 1 - Ist auch nach über 50 Epochen nicht unter 15% gegangen -> nicht so gut
-  # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  # layer_dropout(rate = 0.3) %>%
-  # layer_dense(units = 10, activation = "elu") %>%
-  # layer_dropout(rate = 0.2) %>%
-  # layer_dense(units = 1, activation = "elu")
-  
-  # # Versuch 2 - Lernt schon recht früh auswendig -> 13%
-  # layer_dense(units = 1000, activation = "elu", input_shape = c(44)) %>%
-  # layer_dropout(rate = 0.3) %>%
-  # layer_dense(units = 100, activation = "elu") %>%
-  # layer_dropout(rate = 0.2) %>%
-  # layer_dense(units = 1, activation = "elu")  
-
-  # # Versuch 3 - Nach 10 Epochen schon relativ am Minimum -> 11,8%
-  # # (Pendelt sich nach 30 Epochen bei 11,3% ein)
-  # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  # layer_dropout(rate = 0.3) %>%
-  # layer_dense(units = 50, activation = "elu") %>%
-  # layer_dropout(rate = 0.2) %>%
-  # layer_dense(units = 1, activation = "elu")
-
-  # # Versuch 4 - Pendelt sich um die 12% ein
-  # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  # layer_dropout(rate = 0.3) %>%
-  # layer_dense(units = 30, activation = "elu") %>%
-  # layer_dropout(rate = 0.2) %>%
-  # layer_dense(units = 1, activation = "elu")
-
-  # # Versuch 5 -Pendelt sich um die 13% ein
-  # layer_dense(units = 50, activation = "elu", input_shape = c(44)) %>%
-  # layer_dropout(rate = 0.3) %>%
-  # layer_dense(units = 20, activation = "elu") %>%
-  # layer_dropout(rate = 0.2) %>%
-  # layer_dense(units = 1, activation = "elu")
-
-  # Versuch 6 - Mehrere hidden Layer machen es nicht besser -> 14%
-  layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
-  layer_dropout(rate = 0.3) %>%
-  layer_dense(units = 50, activation = "elu") %>%
-  layer_dropout(rate = 0.2) %>%
-  layer_dense(units = 10, activation = "elu") %>%
-  layer_dropout(rate = 0.1) %>%
-  layer_dense(units = 1, activation = "elu")
-
-m_nn_keras %>% compile(
-  loss = "mse",
-  optimizer = optimizer_rmsprop(),
-  metrics = c("mean_absolute_error")
-)
-summary(m_nn_keras)
-
-history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  epochs = 10, batch_size = 10, 
-  # epochs = 30, batch_size = 10, 
-  validation_split = 0.2
-)
-plot(history_nn_keras)
+# m_nn_keras <- keras_model_sequential()
+# m_nn_keras %>% 
+#   # Versuch 1 - Ist auch nach über 50 Epochen nicht unter 15% gegangen -> nicht so gut
+#   # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dropout(rate = 0.3) %>%
+#   # layer_dense(units = 10, activation = "elu") %>%
+#   # layer_dropout(rate = 0.2) %>%
+#   # layer_dense(units = 1, activation = "elu")
+#   
+#   # # Versuch 2 - Lernt schon recht früh auswendig -> 13%
+#   # layer_dense(units = 1000, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dropout(rate = 0.3) %>%
+#   # layer_dense(units = 100, activation = "elu") %>%
+#   # layer_dropout(rate = 0.2) %>%
+#   # layer_dense(units = 1, activation = "elu")  
+# 
+#   # # Versuch 3 - Nach 10 Epochen schon relativ am Minimum -> 11,8%
+#   # # (Pendelt sich nach 30 Epochen bei 11,3% ein)
+#   # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dropout(rate = 0.3) %>%
+#   # layer_dense(units = 50, activation = "elu") %>%
+#   # layer_dropout(rate = 0.2) %>%
+#   # layer_dense(units = 1, activation = "elu")
+# 
+#   # # Versuch 4 - Pendelt sich um die 12% ein
+#   # layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dropout(rate = 0.3) %>%
+#   # layer_dense(units = 30, activation = "elu") %>%
+#   # layer_dropout(rate = 0.2) %>%
+#   # layer_dense(units = 1, activation = "elu")
+# 
+#   # # Versuch 5 -Pendelt sich um die 13% ein
+#   # layer_dense(units = 50, activation = "elu", input_shape = c(44)) %>%
+#   # layer_dropout(rate = 0.3) %>%
+#   # layer_dense(units = 20, activation = "elu") %>%
+#   # layer_dropout(rate = 0.2) %>%
+#   # layer_dense(units = 1, activation = "elu")
+# 
+#   # Versuch 6 - Mehrere hidden Layer machen es nicht besser -> 14%
+#   layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+#   layer_dropout(rate = 0.3) %>%
+#   layer_dense(units = 50, activation = "elu") %>%
+#   layer_dropout(rate = 0.2) %>%
+#   layer_dense(units = 10, activation = "elu") %>%
+#   layer_dropout(rate = 0.1) %>%
+#   layer_dense(units = 1, activation = "elu")
+# 
+# m_nn_keras %>% compile(
+#   loss = "mse",
+#   optimizer = optimizer_rmsprop(),
+#   metrics = c("mean_absolute_error")
+# )
+# summary(m_nn_keras)
+# 
+# history_nn_keras <- m_nn_keras %>% fit(
+#   trainData_bound, trainData_labels, 
+#   epochs = 10, batch_size = 10, 
+#   # epochs = 30, batch_size = 10, 
+#   validation_split = 0.2
+# )
+# plot(history_nn_keras)
 ```
 
 ### Erstellung des getunten Modells
