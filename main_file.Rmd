@@ -772,7 +772,7 @@ m_nn_keras %>% compile(
   metrics = c("mean_absolute_error")
 )
 summary(m_nn_keras)
-save_model_tf(m_nn_keras, "model/")
+save_model_tf(m_nn_keras, "model/") # speicherung des Modells für REST
 
 history_nn_keras <- m_nn_keras %>% fit(
   trainData_bound, trainData_labels, 
@@ -807,7 +807,7 @@ test_error_nn_keras
 
 Für unseren Fall der Reggression würden wir uns für das getunte Model von keras/tensorflow entscheiden, da dieses den geringsten Error aufweist. Baummodelle waren ebenfalls akzeptabel mit um die 20% Error, allerdings war das Neuronale Netz um zirka 8-10% besser.
 
-## REST vorbeireitung
+# REST Service Vorbeireitung
 
 Für den REST Server werden einige Variablen benötigt. Diese werden hier exportiert.
 
@@ -819,7 +819,209 @@ levels_rating = levels(trainData_scaled$Rating)
 save(levels_city, levels_price_range, levels_rating, pp, unPreProc, file="variables.rda")
 ```
 
+# Text mining
 
+```{r}
+library(tm)
+library(wordcloud)
+library(tidytext)  # für unnest_tokens
+```
 
+Zuerst werden die Review Texte extrahiert und in eine neue Spalte eingefügt.
 
+```{r}
+restaurant_tm <- restaurant_data
+
+# Review Text ausschneiden und in neue Spalte einfügen (Daten entfernen)
+restaurant_tm$ReviewText = gsub('.{31}$', '', restaurant_tm$Reviews)
+# Sonderzeichen entfernen
+restaurant_tm$ReviewText = gsub("[[:punct:]]+","",restaurant_tm$ReviewText)
+```
+
+## Sentiment analysis
+
+Wir analyiseren den Text um die Stimmung/Empfinden der Person zu erkennen, waren ihre Bewertungen positiv oder negativ.
+Dafür schauen wir uns 6 Städte an: London, Paris, Berlin, Madrid, Rom und Wien.
+
+```{r}
+London = restaurant_tm %>% filter(City=="London") %>%  select(ReviewText)
+Paris = restaurant_tm %>% filter(City=="Paris") %>%  select(ReviewText)
+Berlin = restaurant_tm %>% filter(City=="Berlin") %>%  select(ReviewText)
+Madrid = restaurant_tm %>% filter(City=="Madrid") %>%  select(ReviewText)
+Rome = restaurant_tm %>% filter(City=="Rome") %>%  select(ReviewText)
+Vienna = restaurant_tm %>% filter(City=="Vienna") %>%  select(ReviewText)
+```
+
+Um leichter Tokens zu erstellen und um die Tokens in Positiv und Negativ einzuordnen, haben wir zwei Hilfsfunktionen geschrieben.
+
+```{r}
+tokenize = function (review){
+  # Alle Zeilen zu einem Text zusammenfügen
+  words = paste(unlist(review), collapse=" ")
+  # Aus dem Text wird ein tibble
+  # und dieses wird dann in Tokens bzw Keywords umgewandelt
+  tokens = tibble(text=words) %>%
+    unnest_tokens(word,text)
+  # Ergebnis ein tibble mit einer Spalte 'word' das alle Tokens beinhaltet
+  return(tokens)
+}
+
+restaurant_sentiments = function(tokens){
+  sentiments= tokens %>%
+    # Das Empfinden, ob der Toke / das Wort positiv oder negativ ist,
+    # wird mit einem inner join hinzugefügt.
+    # So bleiben nur die relevanten Token über
+    inner_join(get_sentiments("bing")) %>%
+    # positive und negative werden zusammengezählt
+    count(sentiment) %>%
+    # Tabelle spiegeln, neue Spalten: negative, positive
+    pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+    # Spalten deutsch
+    rename("Negativ" = negative) %>%
+    rename("Positiv" = positive) %>%
+    # zusätzliche Spalte 'Unterschied'
+    mutate(Unterschied = Positiv - Negativ)
+  return(sentiments)
+}
+```
+
+Nun werden die Tokens der Reviews je Stadt erzeugt und dann analyisert nach dem Empfinden und zusammengezählt.
+
+```{r}
+# Token generierung je Stadt
+londonTokens = tokenize(London$ReviewText)
+parisTokens = tokenize(Paris$ReviewText)
+berlinTokens =tokenize(Berlin$ReviewText)
+madridTokens = tokenize(Madrid$ReviewText)
+romeTokens = tokenize(Rome$ReviewText)
+viennaTokens = tokenize(Vienna$ReviewText)
+
+# Tokens nach Empfindung zählen
+londonSentiment = restaurant_sentiments(londonTokens)
+parisSentiment = restaurant_sentiments(parisTokens)
+berlinSentiment = restaurant_sentiments(berlinTokens)
+madridSentiment = restaurant_sentiments(madridTokens)
+romeSentiment = restaurant_sentiments(romeTokens)
+viennaSentiment = restaurant_sentiments(viennaTokens)
+
+sentiments= rbind(londonSentiment,parisSentiment, berlinSentiment, 
+                  madridSentiment, romeSentiment, viennaSentiment)
+cities=data.frame(Name=c("London", "Paris", "Berlin", "Madrid", "Rom", "Wien"))
+
+# Städte mit den Empfindungen der Bewertung zusammenführen
+city_sentiments=cbind(cities, sentiments)
+```
+
+Eine grafische Darstellung der Empfindungen der Reviews je Stadt.
+
+```{r}
+sents = city_sentiments %>% 
+  pivot_longer(-Name, names_to="Meinung", values_to="Value") %>% 
+  arrange(Name)
+
+ggplot(sents, aes(x = Meinung, y = Value, fill=Meinung)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title="Positive und negative Bewertungen der Reviewer",
+         subtitle="Und deren Differenz",
+         x="Meinungen",
+         y="Bewertungen")+   
+    facet_wrap(~Name, ncol=2) +
+    theme_bw() + 
+    scale_fill_manual(values=c("#ef5350","#9ccc65","#9e9e9e","#9e9e9e"))+
+    geom_label(aes(label=Value), hjust=0.7, color="white", size=2.5, show.legend=F)+
+    theme(legend.position="top")+
+    coord_flip()
+```
+
+Wie man erkennen kann, haben alle Städte eine positive Differenz, was darauf schließen lässt, dass alle hauptsächlich positiv Bewertet wurden.
+London hat den größten Unterschied von positiven zu negativen Bewertungen, gefolgt von Paris.
+Wien hat die kleinste Differenz, was bedeutet, dass die Anzahl an positiven und negativen Bewertungen sehr ähnlich ist.
+
+##  Corpus erstellen und Document Term Matrix
+
+### Preprocessing
+
+Aus den einzelnen Reviewtexten wird ein Copus erstellt und dieser für die Analyse vorbereitet.
+Dabei werden numbers, capitalization, common words, punctuation bearbeitet bzw.
+entfernt.
+
+```{r}
+corpus=VCorpus(VectorSource(restaurant_tm$ReviewText))
+
+corpus=tm_map(corpus, tolower)
+corpus=tm_map(corpus, removePunctuation)
+corpus=tm_map(corpus, removeWords, stopwords("english"))
+corpus=tm_map(corpus, stripWhitespace)
+corpus=tm_map(corpus, PlainTextDocument)
+```
+
+### Document Term Matrix erstellen
+
+```{r}
+dtm=DocumentTermMatrix(corpus)
+dtm
+length(findFreqTerms(dtm, lowfreq=400))
+```
+```{r}
+3306289152/100
+```
+
+Man kann erkennen, dass viele Wörter nur einmal vorkommen: 26404.
+Die Sparsity ist 100%, genauer 99.985%. Daraus schließen wir, sehr viele Spalten in der Document Term Matrix sind leer(null).
+Ein weiterer interessanter Fakt, nur 189 Wörter kommen mindestends 400 mal oder öfter vor. Darum werden wir die weniger relevanten Wörter im nächsten Schritt entfernen.
+
+```{r}
+dtms = removeSparseTerms(dtm, 0.998) 
+dtms
+most_words = as.data.frame(as.matrix(dtms))
+```
+
+Die Sparsity ist zwar noch sehr hoch, obwohl es schon 1/100 von den ursprünglichen sparse Wörtern ist.
+Nun verbleiben noch 267 Wörter. Reichlich für eine Visualisierung.
+
+```{r}
+freq <- sort(colSums(most_words), decreasing=TRUE)
+head(freq, 15)
+```
+
+Bei Betrachtung der 15 häufigsten Wörter erkennt man viele positive Wörter und Pizza dürfte wohl sehr beliebt sein. Wer mag den keine Pizza?
+
+### Wordcloud
+
+Eine Wordcloud ist ein gutes Diagramm, da es für viele sehr einfach zu verstehen ist und schon bunt ist. 
+
+```{r}
+set.seed(100)
+wordcloud(names(freq), 
+          freq,
+          max.words=150, 
+          random.order = FALSE, 
+          rot.per=0.3,
+          scale=c(5.5, .5),
+          colors = brewer.pal(8, "Dark2"))
+```
+
+### Die meist verwendeten Wörter in den Reviews
+
+```{r}
+words=colnames(most_words)
+frequency=colSums(most_words)
+top_words=data.frame(words, frequency)
+
+ggplot(top_words [top_words$frequency>=2500,], 
+       aes(x= reorder(words,frequency),
+           y=frequency, fill=frequency)) +
+  geom_bar(stat="identity")+
+  coord_flip()+
+  theme_bw() +
+  theme(legend.position="none")+
+  scale_fill_continuous(low="#4dd0e1", high="#64dd17")+
+  labs(title="Häufigkeit der meisten Wörter in den Bewertungen", 
+       subtitle="die mindestens 2500 Mal oder öfter vorkommen",
+       x= "Wörter",
+       y="Häufigkeit") +
+  geom_text(aes(label=frequency), hjust=1.2,color="black", size=3)
+```
+
+Wie schon oben erwähnt, sind die meist verwendeten Wörter positiv. Neben Pizza ist auch italienisches Essen sehr beliebt.
 
