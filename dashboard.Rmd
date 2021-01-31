@@ -1,0 +1,430 @@
+---
+title: "by Pavlis & Steinwender"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+library(flexdashboard)
+library(tidyverse)
+library(caret)
+library(keras)
+library(tidytext)
+library(tm)
+library(wordcloud)
+```
+
+```{r include=FALSE}
+restaurant_data = read.csv(file = "restaurants_data.csv", encoding = "UTF-8")
+restaurant_data = restaurant_data %>% na_if("") 
+restaurant_data = as_tibble(restaurant_data)
+
+restaurant_data = restaurant_data %>%
+  rename("Cuisine_Style" = Cuisine.Style) %>%
+  rename("Price_Range" = Price.Range) %>%
+  rename("Review_Count" = Number.of.Reviews)
+
+restaurant_data = restaurant_data %>%
+  mutate(X = NULL, URL_TA = NULL, ID_TA = NULL) 
+
+restaurant_data = restaurant_data %>% mutate(City = as_factor(City)) 
+
+restaurant_data = restaurant_data %>% mutate(Price_Range = as_factor(Price_Range)) 
+restaurant_data = restaurant_data %>% mutate(Price_Range = fct_recode(
+  Price_Range,
+  "high" = "$$$$",
+  "medium" = "$$ - $$$",
+  "low" = "$"
+)) 
+
+restaurant_data$Rating = restaurant_data$Rating %>% na_if("-1") 
+restaurant_data = restaurant_data %>% mutate(Rating = as_factor(Rating)) 
+
+duplicated(restaurant_data) %>% sum()
+restaurant_data = restaurant_data %>% distinct() 
+
+is.na(restaurant_data) %>% sum()
+sapply(restaurant_data, function(x) sum(is.na(x)))
+```
+
+# Allgemines
+
+Der Datensatz handelt von TripAdvisor Bewertungen vieler Restaurants von 31 europäischen Städten.
+
+Der endgültige Datensatz mit dem wir in diesem Projekt arbeiten werden, besteht aus *acht* Variablen (Spalten) mit *125.238* Observationen (Zeilen).
+Diese beinhalten:
+
+**Name**: Name des Restaurants - Textvariable (unique)
+
+**City**: Stadt in der sich das Restaurant befindet - Kategoriale Faktorvariable mit 31 Ausprägungen (London mit 18113 Einträgen, Paris mit 14867 Einträgen, ...)
+
+**Cuisine_Style**: Essensrichtungen des Restaurants - Textvariable (grundsätzlich besteht diese aus mehreren Faktoren innerhalb eines Python list Objektes / 31222 NA Werte)
+
+**Ranking**: Rang des Restaurants im Vergleich zu allen anderen Restaurants in der Stadt - Diskrete Variable (Min: 1, Mean: 3658, Median: 2256, Max: 16444 / 9370 NA Werte)
+
+**Rating**: Bewertung des Restaurants von 1-5 in 0.5 Schritten - Kategoriale Faktorvariable mit 9 Ausprägungen (Bewertung 4 mit 39841 Einträgen, 4.5 mit 31325 Einträgen, ... / 9389 NA Werte)
+
+**Price_Range**: Preisbewertung - Kategoriale Faktorvariable mit 3 Ausprägungen (medium mit 54302 Einträgen, high mit 4306 Einträgen und low mit 18988 Einträgen / 47642 NA Werte)
+
+**Review_Count**: Anzahl der Reviews - Diskrete Variable (Min: 2, Mean: 125.2, Median: 32, Max: 16478 / 17062 NA Werte)
+
+**Reviews**: Zwei Reviews des Restaurants und die Daten, an dem die Reviews geschrieben wurden - Textvariable (als Python list Objekt abgespeichert)
+
+```{r}
+print.data.frame(slice(restaurant_data,c(1,14,21,24))[-8])
+```
+
+Explorative Datenanalyse {.storyboard}
+=========================================
+
+### Anzahl der Restaurants pro Stadt
+
+```{r}
+city_price_graph <-
+  mutate(restaurant_data, City = fct_infreq(City)) %>%
+  mutate(Price_Range = fct_relevel(Price_Range,
+                                   "high", "medium", "low")) %>%
+  ggplot(aes(x = City)) + geom_bar(aes(fill = Price_Range))
+
+city_price_graph + ggtitle("Anzahl der Restaurants pro Stadt",
+                           subtitle = paste0("Anzahl der Datensätze: ",
+                                             length(which(
+                                               !is.na(restaurant_data$City)
+                                             )))) +
+  xlab("Stadt") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() +
+  theme(axis.text.x = element_text(
+    angle = 90,
+    vjust = 0.5,
+    hjust = 1
+  )) + 
+  scale_fill_brewer(type = "qual", palette = 4, na.value = "grey50")
+```
+
+***
+Hier zu sehen ist die Verteilung der Anzahl der Restaurants pro Stadt absteigend geordnet.
+Zusätzlich ist noch die Verteilung der Preis Einteilung pro Stadt zu sehen. 
+
+Gut zu sehen ist, dass in dem Datensatz Städte wie *London*, *Paris* sehr viele Restaurants besitzen. (Bereich ~15.000+)
+Danach ist ein stärkerer Abfall an Vorkommnissen zu sehen und die Städte *Luxenburg* und *Ljubljana* besitzen am wenigsten Restuarants hier. (<1000)
+
+Auch zu erkennen ist, dass die meisten Restaurants in so gut wie allen Städten in die Preis Klasse *medium* fallen. Am wenigsten Restaurants sind in der Klasse *high*.
+Der Anteil an nicht klassifizierter Restaurants (NA) ist sehr hoch und ist ein beträchtlicher Anteil.
+
+### Anzahl der Restaurants Ratings
+
+```{r}
+ratings_graph = restaurant_data %>%
+  filter(!is.na(Rating)) %>%
+  ggplot(aes(x = Rating)) + geom_bar(aes(fill = Rating))
+
+ratings_graph + ggtitle("Anzahl der Restaurant Ratings Stufen",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Rating)
+                        )))) +
+  xlab("Rating Ebene") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() + 
+  scale_fill_brewer(type = "seq", palette = 3)
+```
+
+***
+Hier zu sehen ist die Verteilung der Anzahl der Rating Stufen.
+
+Gut zu erkennen ist, dass die Ratings 4 und 4.5 am häufigsten gegeben werden und Ratings wie 3 oder 5 viel seltener.
+Ratings <= 2.5 kommen am seltensten vor. Dies könnte sich dadurch erklären lassen, dass diese Restaurants sich nicht besonders gut halten werden und wahrscheinlich öfters schließen müssen als Restauraunts mit besseren Bewertungen.
+
+### Anzahl der Restaurant Ratings pro Preisklasse
+
+```{r}
+ratings_price_graph = restaurant_data %>%
+  filter(!is.na(Rating)) %>%
+  ggplot(aes(x = Rating)) + geom_bar(aes(fill = Rating)) + facet_wrap( ~Price_Range)
+
+ratings_price_graph + ggtitle("Anzahl der Restaurant Ratings Stufen pro Preisklasse",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Rating)
+                        )))) +
+  xlab("Rating Ebene") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() + 
+  scale_fill_brewer(type = "seq", palette = 3)
+```
+
+***
+Hier zu sehen ist die Verteilung der Anzahl der Rating Stufen pro Preisklasse.
+
+Es ist ersichtlich, dass Restaurants mit einer niedrigen Preisklasse tendenziell eher weniger hohe Bewertungen haben (im Vergleich zu den anderen Preisklassen)
+Restaurants in einer hohen Preisklasse hingegen besitzen höhere Ratings welche im Schnitt 4 oder höher sind.
+
+Ein weiteres interessantes Merkmal ist, dass Restaurants ohne Preisklasseneinstufung tendenziell viel mehr 5 Sterne Bewertungen haben.
+Dies kann entweder ein statistischer Zufall sein oder es könnte daran liegen, dass diese Restaurants nicht in traditionelle Preisklassen eingeteilt werden können und dadurch Leute besser ansprechen (was aber eher weit hergeholt ist).
+
+### Review Anzahl
+
+```{r}
+reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% ggplot(aes(x = Review_Count)) + geom_histogram(aes(fill=stat(count)), binwidth = 50)
+
+reviewCount_graph + ggtitle("Verteilung der Review Anzahl",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Review_Count)
+                        )), " | Binwidth = 50")) +
+  xlab("Review Anzahl") +
+  ylab("Anzahl der Vorkommnisse") +
+  theme_bw() +
+  xlim(0, 2500) + ylim(0, 25000) +
+  scale_fill_distiller(type = "seq", palette = 5)
+```
+
+***
+Hier zu sehen ist die Verteilung der Anzahl der Review Bewertungen.
+
+Dieser Graph gruppiert auf der x-Achse die Anzahl der Reviews in 50er Blöcke und stellt davon die Anzahl der Vorkommnisse auf der y-Achse dar.
+
+Hier kann man stark betrachten, dass die Verteilung stark rechts fallend ist und die meisten Vorkommnisse in die Kategorie von 0-50 Reviews fallen.
+Dies bedeutet, dass die meisten Restaurants wenig Reviews haben und das nur noch ein sehr kleiner Anteil an Restaurants mehr als 500 Reviews haben.
+
+### Restaurant Ranking erklärt durch Review Anzahl
+
+```{r}
+ranking_reviewCount_graph = restaurant_data %>% filter(!is.na(Review_Count)) %>% filter(!is.na(Ranking)) %>% ggplot(aes(x = Review_Count, y = Ranking)) +
+  geom_point() + geom_smooth(method = "gam")
+
+ranking_reviewCount_graph + ggtitle("Restaurant Ranking erklärt durch Review Anzahl",
+                        subtitle = paste0("Anzahl der Datensätze: ", length(which(
+                          !is.na(restaurant_data$Ranking)
+                        )))) +
+  xlab("Review Anzahl") +
+  ylab("Ranking des Restaurants") +
+  theme_bw() +
+  scale_y_continuous(trans = "reverse", limits = c(17000, 1))
+```
+
+***
+Hier zu sehen ist die Verteilung des Rankings von Restaurants erklärt durch die Review Anzahl.
+
+Es ist eindeutig ersichtlich, dass Restaurants welche ein hohes Ranking in ihrer Stadt haben, eine dementsprechend höhere Anzahl an Reviews hat.
+Dies kann sich dadurch erklären lassen, dass Top-Restaurants öfters besucht werden und dadurch mehr Leute auch eine Bewertung schreiben.
+
+
+Modellierung 
+=======================
+
+Column
+------------------------------------------
+
+### 
+
+```{r}
+data_not_null = mutate(restaurant_data, Name = NULL, Reviews = NULL, Cuisine_Style = NULL) %>% drop_na()
+
+N = nrow(data_not_null)
+train_ind = sample(1 : N, size = N * 2/3)
+trainData = data_not_null[train_ind,]
+
+pp = preProcess(trainData, method = c("center", "scale"))
+trainData_scaled = predict(pp, trainData)
+
+trainData_bcoded_City = to_categorical(as.integer(trainData_scaled$City) - 1)
+trainData_bcoded_Rating = to_categorical(as.integer(trainData_scaled$Rating) - 1)
+trainData_bcoded_Price_Range = to_categorical(as.integer(trainData_scaled$Price_Range) - 1)
+
+trainData_bound = cbind(
+  trainData_bcoded_City,
+  trainData_bcoded_Rating,
+  trainData_bcoded_Price_Range,
+  trainData_scaled$Review_Count
+)
+trainData_labels = trainData_scaled$Ranking
+
+m_nn_keras <- keras_model_sequential()
+m_nn_keras %>% 
+  layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 50, activation = "elu") %>%
+  layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 1, activation = "elu")
+
+m_nn_keras %>% compile(
+  loss = "mse",
+  optimizer = optimizer_rmsprop(),
+  metrics = c("mean_absolute_error")
+)
+
+history_nn_keras <- m_nn_keras %>% fit(
+  trainData_bound, trainData_labels, 
+  epochs = 20, batch_size = 10, 
+  validation_split = 0.2
+)
+plot(history_nn_keras)
+```
+
+Column {data-width=300}
+-----------------------------------------------------------------------
+
+### 
+Auswahl des Merkmals zur Vorhersage:
+
+Auswahl: Ranking
+
+Das Ranking sollte ein gutes Merkmal für die Vorhersage sein, da dieser gut durch die anderen Parameter vorhersagbar sein sollte (in gewissen Grenzen) und da er recht interessant für neue Restaurants sein könnte.
+
+Dadurch könnte man dann schauen, in welcher Stadt es sich auszahlen würde, Restaurants zu öffnen, anhand des jeweiligen Rankings im Vergleich zu den anderen Restaurants in der Stadt.
+
+Außerdem hatten wir in der LV und bei den Übungen sehr viel mit Klassifikation zu tun und wollten dies auch einmal mit einem Reggressionsbeispiel durchprobieren.
+
+Vorgestellt wird ein Neural Network.
+
+Es gibt mehrere akzeptable Modelle. 
+Eine davon ist Elu mit 20 Input Units und 7 Epochen (Es Overfitted meist ab 7-10 Epochen im Schnitt)
+  -> Kommt auf in etwa 11,4% Error
+  
+Trotzdem haben wir uns nach vielen Durchläufen dazu entschieden, ein Modell mit mehreren hidden layers zu nehmen, da diese mit über zehn verschiedenen Zuteilungen auf Trainings- und Testdaten, konsistent waren. Die mit nur einem hidden layer hatten in 3/10 starke Inkonsistenz und haben zum Beispiel schon in der zweiten Epoche overfitted, was wir vermeiden wollten. Seeden wäre auch ein Option gewesen, hätte aber eher zum selektiven Datenaussuchen geführt, was wir vermeiden wollten damit ein gutes Generalisationsmodell entsteht.
+
+Anmerkung: Beim Testen von den Varianten mit nur einem hidden layer kommt es hin und wieder vor, dass Unglückliche Werte oder Gewichte anfänglich genommen werden und dieses Ergebnis dadurch anders aussieht (zb Früheres Overfitting oder andere weirde Ergebnisse)
+
+Für unseren Fall der Reggression würden wir uns für das getunte Model von keras/tensorflow entscheiden, da dieses den geringsten Error aufweist. Baummodelle waren ebenfalls akzeptabel mit um die 20% Error, allerdings war das Neuronale Netz um zirka 8-10% besser.
+
+Text Mining {.storyboard}
+=========================
+
+### Sentiment analysis
+
+```{r}
+restaurant_tm <- restaurant_data
+
+restaurant_tm$ReviewText = gsub('.{31}$', '', restaurant_tm$Reviews)
+restaurant_tm$ReviewText = gsub("[[:punct:]]+","",restaurant_tm$ReviewText)
+
+London = restaurant_tm %>% filter(City=="London") %>%  select(ReviewText)
+Paris = restaurant_tm %>% filter(City=="Paris") %>%  select(ReviewText)
+Berlin = restaurant_tm %>% filter(City=="Berlin") %>%  select(ReviewText)
+Madrid = restaurant_tm %>% filter(City=="Madrid") %>%  select(ReviewText)
+Rome = restaurant_tm %>% filter(City=="Rome") %>%  select(ReviewText)
+Vienna = restaurant_tm %>% filter(City=="Vienna") %>%  select(ReviewText)
+
+tokenize = function (review){
+  words = paste(unlist(review), collapse=" ")
+  tokens = tibble(text=words) %>%
+    unnest_tokens(word,text)
+  return(tokens)
+}
+
+restaurant_sentiments = function(tokens){
+  sentiments= tokens %>%
+    inner_join(get_sentiments("bing")) %>%
+    count(sentiment) %>%
+    pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+    rename("Negativ" = negative) %>%
+    rename("Positiv" = positive) %>%
+    mutate(Unterschied = Positiv - Negativ)
+  return(sentiments)
+}
+
+londonTokens = tokenize(London$ReviewText)
+parisTokens = tokenize(Paris$ReviewText)
+berlinTokens =tokenize(Berlin$ReviewText)
+madridTokens = tokenize(Madrid$ReviewText)
+romeTokens = tokenize(Rome$ReviewText)
+viennaTokens = tokenize(Vienna$ReviewText)
+
+londonSentiment = restaurant_sentiments(londonTokens)
+parisSentiment = restaurant_sentiments(parisTokens)
+berlinSentiment = restaurant_sentiments(berlinTokens)
+madridSentiment = restaurant_sentiments(madridTokens)
+romeSentiment = restaurant_sentiments(romeTokens)
+viennaSentiment = restaurant_sentiments(viennaTokens)
+
+sentiments= rbind(londonSentiment,parisSentiment, berlinSentiment, 
+                  madridSentiment, romeSentiment, viennaSentiment)
+cities=data.frame(Name=c("London", "Paris", "Berlin", "Madrid", "Rom", "Wien"))
+
+city_sentiments=cbind(cities, sentiments)
+
+sents = city_sentiments %>% 
+  pivot_longer(-Name, names_to="Meinung", values_to="Value") %>% 
+  arrange(Name)
+
+ggplot(sents, aes(x = Meinung, y = Value, fill=Meinung)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title="Positive und negative Bewertungen der Reviewer",
+         subtitle="Und deren Differenz",
+         x="Meinungen",
+         y="Bewertungen")+   
+    facet_wrap(~Name, ncol=2) +
+    theme_bw() + 
+    scale_fill_manual(values=c("#ef5350","#9ccc65","#9e9e9e","#9e9e9e"))+
+    geom_label(aes(label=Value), hjust=0.7, color="white", size=2.5, show.legend=F)+
+    theme(legend.position="top")+
+    coord_flip()
+```
+
+***
+Eine grafische Darstellung der Empfindungen der Reviews je Stadt.
+
+Wir analyiseren den Text um die Stimmung/Empfinden der Person zu erkennen, waren ihre Bewertungen positiv oder negativ.
+Dafür schauen wir uns 6 Städte an: London, Paris, Berlin, Madrid, Rom und Wien.
+
+Wie man erkennen kann, haben alle Städte eine positive Differenz, was darauf schließen lässt, dass alle hauptsächlich positiv Bewertet wurden.
+London hat den größten Unterschied von positiven zu negativen Bewertungen, gefolgt von Paris.
+Wien hat die kleinste Differenz, was bedeutet, dass die Anzahl an positiven und negativen Bewertungen sehr ähnlich ist.
+
+### Wordcloud
+
+```{r}
+corpus=VCorpus(VectorSource(restaurant_tm$ReviewText))
+
+corpus=tm_map(corpus, tolower)
+corpus=tm_map(corpus, removePunctuation)
+corpus=tm_map(corpus, removeWords, stopwords("english"))
+corpus=tm_map(corpus, stripWhitespace)
+corpus=tm_map(corpus, PlainTextDocument)
+
+dtm=DocumentTermMatrix(corpus)
+dtms = removeSparseTerms(dtm, 0.998) 
+most_words = as.data.frame(as.matrix(dtms))
+freq <- sort(colSums(most_words), decreasing=TRUE)
+
+set.seed(100)
+wordcloud(names(freq), 
+          freq,
+          max.words=150, 
+          random.order = FALSE, 
+          rot.per=0.3,
+          scale=c(5.5, .5),
+          colors = brewer.pal(8, "Dark2"))
+```
+
+***
+Aus den einzelnen Reviewtexten wird ein Copus erstellt und dieser für die Analyse vorbereitet.
+Dabei werden numbers, capitalization, common words, punctuation bearbeitet bzw.
+entfernt.
+
+### Unigram
+
+```{r}
+words=colnames(most_words)
+frequency=colSums(most_words)
+top_words=data.frame(words, frequency)
+
+ggplot(top_words [top_words$frequency>=2500,], 
+       aes(x= reorder(words,frequency),
+           y=frequency, fill=frequency)) +
+  geom_bar(stat="identity")+
+  coord_flip()+
+  theme_bw() +
+  theme(legend.position="none")+
+  scale_fill_continuous(low="#4dd0e1", high="#64dd17")+
+  labs(title="Häufigkeit der meisten Wörter in den Bewertungen", 
+       subtitle="die mindestens 2500 Mal oder öfter vorkommen",
+       x= "Wörter",
+       y="Häufigkeit") +
+  geom_text(aes(label=frequency), hjust=1.2,color="black", size=3)
+```
+
+***
+Bei Betrachtung der häufigsten Wörter erkennt man viele positive Wörter und Pizza dürfte wohl sehr beliebt sein. Wer mag den keine Pizza? Neben Pizza ist auch italienisches Essen sehr beliebt.
