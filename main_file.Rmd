@@ -9,12 +9,6 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### Clean the environment variables (*Temporary*)
-*Remove this whole header before handing the project in. This is just so that working with the document is easier*
-```{r}
-rm(list = ls())
-```
-
 # Load needed libraries
 
 ```{r}
