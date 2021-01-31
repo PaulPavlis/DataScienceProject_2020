@@ -50,7 +50,9 @@ is.na(restaurant_data) %>% sum()
 sapply(restaurant_data, function(x) sum(is.na(x)))
 ```
 
-# Allgemines
+# Allgemeines
+
+###
 
 Der Datensatz handelt von TripAdvisor Bewertungen vieler Restaurants von 31 europäischen Städten.
 
@@ -73,8 +75,10 @@ Diese beinhalten:
 
 **Reviews**: Zwei Reviews des Restaurants und die Daten, an dem die Reviews geschrieben wurden - Textvariable (als Python list Objekt abgespeichert)
 
+###
+
 ```{r}
-print.data.frame(slice(restaurant_data,c(1,14,21,24))[-8])
+print.data.frame(slice(restaurant_data,c(1,14,21)))
 ```
 
 Explorative Datenanalyse {.storyboard}
@@ -242,7 +246,7 @@ trainData_bound = cbind(
 trainData_labels = trainData_scaled$Ranking
 
 m_nn_keras <- keras_model_sequential()
-m_nn_keras %>% 
+m_nn_keras %>%
   layer_dense(units = 100, activation = "elu", input_shape = c(44)) %>%
   layer_dropout(rate = 0.3) %>%
   layer_dense(units = 50, activation = "elu") %>%
@@ -256,8 +260,8 @@ m_nn_keras %>% compile(
 )
 
 history_nn_keras <- m_nn_keras %>% fit(
-  trainData_bound, trainData_labels, 
-  epochs = 20, batch_size = 10, 
+  trainData_bound, trainData_labels,
+  epochs = 20, batch_size = 10,
   validation_split = 0.2
 )
 plot(history_nn_keras)
@@ -275,8 +279,6 @@ Das Ranking sollte ein gutes Merkmal für die Vorhersage sein, da dieser gut dur
 
 Dadurch könnte man dann schauen, in welcher Stadt es sich auszahlen würde, Restaurants zu öffnen, anhand des jeweiligen Rankings im Vergleich zu den anderen Restaurants in der Stadt.
 
-Außerdem hatten wir in der LV und bei den Übungen sehr viel mit Klassifikation zu tun und wollten dies auch einmal mit einem Reggressionsbeispiel durchprobieren.
-
 Vorgestellt wird ein Neural Network.
 
 Es gibt mehrere akzeptable Modelle. 
@@ -284,8 +286,6 @@ Eine davon ist Elu mit 20 Input Units und 7 Epochen (Es Overfitted meist ab 7-10
   -> Kommt auf in etwa 11,4% Error
   
 Trotzdem haben wir uns nach vielen Durchläufen dazu entschieden, ein Modell mit mehreren hidden layers zu nehmen, da diese mit über zehn verschiedenen Zuteilungen auf Trainings- und Testdaten, konsistent waren. Die mit nur einem hidden layer hatten in 3/10 starke Inkonsistenz und haben zum Beispiel schon in der zweiten Epoche overfitted, was wir vermeiden wollten. Seeden wäre auch ein Option gewesen, hätte aber eher zum selektiven Datenaussuchen geführt, was wir vermeiden wollten damit ein gutes Generalisationsmodell entsteht.
-
-Anmerkung: Beim Testen von den Varianten mit nur einem hidden layer kommt es hin und wieder vor, dass Unglückliche Werte oder Gewichte anfänglich genommen werden und dieses Ergebnis dadurch anders aussieht (zb Früheres Overfitting oder andere weirde Ergebnisse)
 
 Für unseren Fall der Reggression würden wir uns für das getunte Model von keras/tensorflow entscheiden, da dieses den geringsten Error aufweist. Baummodelle waren ebenfalls akzeptabel mit um die 20% Error, allerdings war das Neuronale Netz um zirka 8-10% besser.
 

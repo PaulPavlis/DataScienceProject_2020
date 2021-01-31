@@ -309,8 +309,9 @@ dadurch menschlich lesbare Ergebnisse zu erhalten.
 
 ```{r}
 unPreProc <- function(preProc, data){
-  data <- data[, 1] * preProc$std[[1]] + preProc$mean[[1]]
-  return(data)
+  data_digits <- data[, 1] * preProc$std[[1]] + preProc$mean[[1]]
+  data_round <- round(data_digits, digits = 0)
+  return(data_round)
 }
 ```
 
